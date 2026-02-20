@@ -1,0 +1,226 @@
+-- AUTO DUEL FASTEST WAYPOINT TESTER
+-- Instant waypoint transitions - NO WAITING
+-- Made by @ryzee2ww
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Player = Players.LocalPlayer
+
+local PURPLE = Color3.fromRGB(138, 43, 226)
+local LIGHT_PURPLE = Color3.fromRGB(186, 85, 211)
+local DARKER_BG = Color3.fromRGB(25, 25, 40)
+local BTN_BG = Color3.fromRGB(35, 35, 50)
+
+local function Create(className, properties)
+    local instance = Instance.new(className)
+    for k, v in pairs(properties or {}) do
+        instance[k] = v
+    end
+    return instance
+end
+
+for _, gui in pairs(CoreGui:GetChildren()) do
+    if gui.Name == "LXKCR_FastTester" then
+        gui:Destroy()
+    end
+end
+
+local TesterGui = Create("ScreenGui", {
+    Name = "LXKCR_FastTester",
+    ResetOnSpawn = false,
+    Parent = CoreGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+})
+
+local TesterFrame = Create("Frame", {
+    Size = UDim2.new(0, 250, 0, 120),
+    Position = UDim2.new(0.5, -125, 0.5, -60),
+    BackgroundColor3 = DARKER_BG,
+    BorderSizePixel = 0,
+    Parent = TesterGui
+})
+
+Create("UICorner", {CornerRadius = UDim.new(0, 12), Parent = TesterFrame})
+Create("UIStroke", {Color = PURPLE, Thickness = 3, Parent = TesterFrame})
+
+local Title = Create("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 30),
+    Position = UDim2.new(0, 10, 0, 10),
+    BackgroundTransparency = 1,
+    Text = "INSTANT WAYPOINT TEST",
+    TextColor3 = PURPLE,
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextXAlignment = Enum.TextXAlignment.Center,
+    Parent = TesterFrame
+})
+
+local StartBtn = Create("TextButton", {
+    Size = UDim2.new(1, -40, 0, 50),
+    Position = UDim2.new(0, 20, 0, 50),
+    BackgroundColor3 = BTN_BG,
+    BorderSizePixel = 0,
+    Text = "START INSTANT TEST",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    Parent = TesterFrame
+})
+
+Create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = StartBtn})
+Create("UIStroke", {Color = PURPLE, Thickness = 2, Parent = StartBtn})
+
+local autoDuelRunning = false
+
+local function getHRP()
+    local char = Player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function startInstantAutoDuel()
+    if autoDuelRunning then return end
+    autoDuelRunning = true
+    
+    local function getPlayerSide()
+        local hrp = getHRP()
+        if not hrp then return "unknown" end
+        
+        if hrp.Position.Z > 60 then
+            return "right"
+        else
+            return "left"
+        end
+    end
+    
+    local function runAutoDuel()
+        if not autoDuelRunning then return end
+        
+        local side = getPlayerSide()
+        
+        local VELOCITY_SPEED = 58
+        local SECOND_PHASE_SPEED = 29.4
+        local JUMP_VELOCITY = 50
+        
+        local path
+        if side == "right" then
+            path = {
+                {pos = Vector3.new(-470.6, -5.9, 34.4)},
+                {pos = Vector3.new(-484.2, -3.9, 21.4)},
+                {pos = Vector3.new(-475.6, -5.8, 29.3)},
+                {pos = Vector3.new(-473.4, -5.9, 111)}
+            }
+        else
+            path = {
+                {pos = Vector3.new(-474.7, -5.9, 91.0)},
+                {pos = Vector3.new(-483.4, -3.9, 97.3)},
+                {pos = Vector3.new(-474.7, -5.9, 91.0)},
+                {pos = Vector3.new(-476.1, -5.5, 25.4)}
+            }
+        end
+        
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        
+        for i, point in ipairs(path) do
+            if not autoDuelRunning then break end
+            
+            local speed = i > 2 and SECOND_PHASE_SPEED or VELOCITY_SPEED
+            
+            local conn
+            conn = RunService.Heartbeat:Connect(function()
+                if not autoDuelRunning then
+                    conn:Disconnect()
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    return
+                end
+                
+                local pos = hrp.Position
+                local dir = Vector3.new(point.pos.X, pos.Y, point.pos.Z) - pos
+                
+                if dir.Magnitude <= 2 then
+                    conn:Disconnect()
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    return
+                end
+                
+                hrp.AssemblyLinearVelocity = Vector3.new(dir.Unit.X * speed, hrp.AssemblyLinearVelocity.Y, dir.Unit.Z * speed)
+            end)
+            
+            while autoDuelRunning and (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(point.pos.X, 0, point.pos.Z)).Magnitude > 2 do
+                RunService.Heartbeat:Wait()
+            end
+            
+            if i == 2 and autoDuelRunning then
+                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, JUMP_VELOCITY, hrp.AssemblyLinearVelocity.Z)
+                -- NO WAIT - INSTANT JUMP!
+            end
+            
+            -- NO WAIT BETWEEN WAYPOINTS - INSTANT TRANSITIONS!
+        end
+        
+        if autoDuelRunning then
+            runAutoDuel() -- INSTANTLY RESTART LOOP
+        end
+    end
+    
+    task.spawn(runAutoDuel)
+end
+
+local function stopInstantAutoDuel()
+    autoDuelRunning = false
+    
+    local char = Player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
+StartBtn.MouseButton1Click:Connect(function()
+    if autoDuelRunning then
+        stopInstantAutoDuel()
+        StartBtn.Text = "START INSTANT TEST"
+        StartBtn.BackgroundColor3 = BTN_BG
+    else
+        startInstantAutoDuel()
+        StartBtn.Text = "STOP TEST"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    end
+end)
+
+local dragging, dragInput, dragStart, startPos
+
+TesterFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = TesterFrame.Position
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        TesterFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+print("✅ INSTANT WAYPOINT TESTER LOADED!")
+print("⚡ NO WAITS - Instantly moves to next waypoint!")
+print("⚡ NO JUMP WAIT - Instant jump!")
+print("⚡ NO LOOP WAIT - Instant restart!")
